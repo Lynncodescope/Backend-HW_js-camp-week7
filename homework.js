@@ -23,7 +23,7 @@ const ADMIN_TOKEN = process.env.API_KEY;
  * @returns {string} - 格式 'YYYY/MM/DD HH:mm'，例如 '2024/01/01 08:00'
  */
 function formatOrderDate(timestamp) {
-  // 請實作此函式
+  return dayjs.unix(timestamp).format('YYYY/MM/DD HH:mm');
   // 提示：dayjs.unix(timestamp).format('YYYY/MM/DD HH:mm')
 }
 
@@ -33,7 +33,14 @@ function formatOrderDate(timestamp) {
  * @returns {string} - 例如 '3 天前' 或 '今天'
  */
 function getDaysAgo(timestamp) {
-  // 請實作此函式
+  const today = dayjs();
+  const orderDate = dayjs.unix(timestamp);
+  const diff = today.diff(orderDate, 'day');
+  if (diff === 0){
+    return '今天';
+  }else{
+    return `${diff}天前`;
+  }
   // 提示：
   // 1. 用 dayjs() 取得今天
   // 2. 用 dayjs.unix(timestamp) 取得訂單日期
@@ -46,7 +53,21 @@ function getDaysAgo(timestamp) {
  * @returns {boolean} - 超過 7 天回傳 true
  */
 function isOrderOverdue(timestamp) {
-  // 請實作此函式
+  // 首先，還是要先用 dayjs() 知道今天日期
+  // 第二，使用 dayjs.unix(timestamp) 取得訂單日期
+  // 第三，一樣使用 .diff() 計算天數差異
+
+  const today = dayjs();
+  const orderDate = dayjs.unix(timestamp);
+
+  if (today.diff(orderDate, 'day') > 7){
+    return true;
+  }else{
+    return false;
+  }
+  
+  // 助教直接將上面那段if判斷是寫成這樣：return today.diff(orderDate, 'day') > 7;
+  // 因為 today.diff(orderDate, 'day') > 7 這段結果不是true就是false，若符合需要，就直接丟出去（return）就好了。
 }
 
 /**
@@ -55,7 +76,17 @@ function isOrderOverdue(timestamp) {
  * @returns {Array} - 篩選出 createdAt 在本週的訂單
  */
 function getThisWeekOrders(orders) {
-  // 請實作此函式
+  const thisWeekStart = dayjs().startOf('week');
+  const thisWeekEnd = dayjs().endOf('week');
+
+  return orders.filter (function (order){
+    const orderDate = dayjs.unix(order.createdAt);
+    if (orderDate.isAfter(thisWeekStart) && orderDate.isBefore(thisWeekEnd)){
+      return true;
+    }else{
+      false;
+    }
+  })
   // 提示：
   // 1. 用 dayjs().startOf('week') 取得本週開始
   // 2. 用 dayjs().endOf('week') 取得本週結束
@@ -79,7 +110,33 @@ function getThisWeekOrders(orders) {
  * - payment: 必須是 'ATM', 'Credit Card', 'Apple Pay' 其中之一
  */
 function validateOrderUser(data) {
-  // 請實作此函式
+  const telRegex = /^09\d{8}$/;
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const validPayments = ["ATM", "Credit Card", "Apple Pay"];
+  
+  const errors = [];
+
+  if (!data.name || data.name.trim().length === 0){    //.trim()移除前後方的空格
+    errors.push('姓名欄位不可空白');
+  }
+
+  if (!telRegex.test(data.tel)){
+    errors.push('電話欄位必須是 09 開頭的 10 位數字')
+  }
+
+  if (!emailRegex.test(data.email)){
+    errors.push('email欄位必須包含 @ 符號')
+  }
+
+  if (!data.address || data.address.trim().length === 0){
+    errors.push('地址欄位不可空白');
+  }
+
+  if (!validPayments.includes(data.payment)){   // 這裡if()內的條件是如果可用的付款條件「不包含」在有效訂單(data)內的.payment屬性。
+    errors.push("付款方式必須是 'ATM', 'Credit Card', 'Apple Pay' 其中之一")
+  }
+
+  return {isValid: errors.length === 0, errors}
 }
 
 /**
@@ -93,7 +150,19 @@ function validateOrderUser(data) {
  * - 不可大於 99
  */
 function validateCartQuantity(quantity) {
-  // 請實作此函式
+  if (!Number.isInteger(quantity)){
+    return {isValid: false, error: '數量必須是正整數'}
+  }
+
+  if (quantity < 1){
+    return {isValid: false, error: '數量不可小於 1'}
+  }
+
+  if (quantity > 99){
+    return {isValid: false, error: '數量不可大於 99'}
+  }
+
+  return {isValid: true}
 }
 
 // ========================================
@@ -105,8 +174,9 @@ function validateCartQuantity(quantity) {
  * @returns {string} - 格式 'ORD-xxxxxxxx'
  */
 function generateOrderId() {
-  // 請實作此函式
+  return `ORD-${Date.now().toString(36) + Math.random().toString(36).slice(2)}`
   // 提示：可以用 Date.now().toString(36) + Math.random().toString(36).slice(2)
+  // 也可以使用UUID，UUID也直接有函式庫可以拿來使用，找時間查。
 }
 
 /**
@@ -114,7 +184,7 @@ function generateOrderId() {
  * @returns {string} - 格式 'CART-xxxxxxxx'
  */
 function generateCartItemId() {
-  // 請實作此函式
+  return `CART-${Date.now().toString(36) + Math.random().toString(36).slice(2)}`
 }
 
 // ========================================
@@ -126,7 +196,8 @@ function generateCartItemId() {
  * @returns {Promise<Array>} - 回傳 products 陣列
  */
 async function getProductsWithAxios() {
-  // 請實作此函式
+  const response = await axios.get(`${BASE_URL}/api/livejs/v1/customer/${API_PATH}/products`);
+  return response.data.products;
   // 提示：axios.get() 會自動解析 JSON，不需要 .json()
   // 回傳 response.data.products
 }
@@ -138,7 +209,12 @@ async function getProductsWithAxios() {
  * @returns {Promise<Object>} - 回傳購物車資料
  */
 async function addToCartWithAxios(productId, quantity) {
-  // 請實作此函式
+  const response = await axios.post (`${BASE_URL}/api/livejs/v1/customer/${API_PATH}/carts`,{
+    data:{
+      productId,
+      quantity}
+  });
+  return response.data;
   // 提示：axios.post(url, data) 會自動設定 Content-Type
 }
 
@@ -147,18 +223,24 @@ async function addToCartWithAxios(productId, quantity) {
  * @returns {Promise<Array>} - 回傳訂單陣列
  */
 async function getOrdersWithAxios() {
-  // 請實作此函式
+  const response = await axios.get (`${BASE_URL}/api/livejs/v1/admin/${API_PATH}/orders`,{
+    headers: {
+      Authorization: ADMIN_TOKEN
+    }
+  })
+
+  return response.data.orders;
   // 提示：axios.get(url, { headers: { authorization: token } })
 }
 
 /*
 比較題：請說明 fetch 和 axios 的主要差異
 
-1. ____________________________________
+1. axios 會自動解析JSON，不需要如同fetch需用 .json()解析。
 
-2. ____________________________________
+2. axios 會將HTTP CODE - 4XX、5XX視為錯誤，但fetch只有在網路錯誤時才會，因此要用try catch額外處理HTTP CODE - 4XX、5XX的狀態。
 
-3. ____________________________________
+3. axios 會自動設定Content-Type，並將物件轉成JSON，但fetch需要手動設定header和body(用JSON.stringify(body)。
 */
 
 // ========================================
@@ -178,7 +260,13 @@ const OrderService = {
    * @returns {Promise<Array>} - 訂單陣列
    */
   async fetchOrders() {
-    // 請實作此函式
+    const response = await axios.get (`${this.baseURL}/api/livejs/v1/admin/${this.apiPath}/orders`,{
+    headers: {
+      Authorization: this.token
+    }
+  })
+
+  return response.data.orders;
   },
 
   /**
@@ -187,7 +275,12 @@ const OrderService = {
    * @returns {Array} - 為每筆訂單加上 formattedDate 欄位
    */
   formatOrders(orders) {
-    // 請實作此函式
+    return orders.map(function(order){
+      return {
+        ...order,
+        formattedDate: dayjs.unix(order.createdAt).format('YYYY/MM/DD HH:MM')
+      }
+    });
   },
 
   /**
@@ -196,7 +289,9 @@ const OrderService = {
    * @returns {Array} - paid: false 的訂單
    */
   filterUnpaidOrders(orders) {
-    // 請實作此函式
+    return orders.filter (function (order){
+      return !order.paid;
+    })
   },
 
   /**
